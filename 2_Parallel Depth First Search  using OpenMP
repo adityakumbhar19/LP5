@@ -1,0 +1,63 @@
+#include <iostream>
+#include <vector>
+#include <omp.h>
+
+using namespace std;
+
+void parallelDFSUtil(int node, const vector<vector<int>> &graph, vector<bool> &visited) {
+    #pragma omp critical
+    {
+        if (visited[node]) return;
+        visited[node] = true;
+        cout << node << " ";
+    }
+
+    // Create tasks for each unvisited neighbor
+    for (int neighbor : graph[node]) {
+        bool alreadyVisited;
+        #pragma omp critical
+        {
+            alreadyVisited = visited[neighbor];
+        }
+
+        if (!alreadyVisited) {
+            #pragma omp task firstprivate(neighbor)
+            parallelDFSUtil(neighbor, graph, visited);
+        }
+    }
+
+    #pragma omp taskwait
+}
+
+void parallelDFS(const vector<vector<int>> &graph, int startNode) {
+    int n = graph.size();
+    vector<bool> visited(n, false);
+
+    #pragma omp parallel
+    {
+        #pragma omp single
+        {
+            parallelDFSUtil(startNode, graph, visited);
+        }
+    }
+}
+
+int main() {
+    // Example undirected graph
+    int nodes = 6;
+    vector<vector<int>> graph(nodes);
+
+    // Add edges
+    graph[0] = {1, 2};
+    graph[1] = {0, 3, 4};
+    graph[2] = {0, 4};
+    graph[3] = {1, 5};
+    graph[4] = {1, 2, 5};
+    graph[5] = {3, 4};
+
+    cout << "Parallel DFS Traversal: ";
+    parallelDFS(graph, 0);
+    cout << endl;
+
+    return 0;
+}
